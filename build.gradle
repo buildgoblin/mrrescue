@@ -1,0 +1,84 @@
+import org.apache.commons.configuration.plist.XMLPropertyListConfiguration
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'commons-configuration', name: 'commons-configuration', version: '1.9'
+    }
+}
+
+task clean(type: Delete) {
+	delete 'dist'
+	delete 'build'
+	delete 'zip'
+}
+
+task love << {
+	ant.zip(destFile: 'build/build.love', level:9){
+		fileset(dir: '.') {
+			include(name: '*.lua')
+			include(name: 'data/**')
+			include(name: 'maps/**')
+		}
+	}
+}
+
+task windowsBase(type: Copy) {
+	from '../love2d-dist/love-0.8.0-win-x86'
+	from 'LICENSE'
+	into 'dist/windows'
+}
+
+task windowsExe(dependsOn: windowsBase) << {
+	ant.concat(destfile: 'dist/windows/mrrescue.exe', binary: true){
+		fileset(dir:'dist/windows',  includes:'love.exe')
+		fileset(dir:'build',  includes:'build.love')
+	}
+	delete('dist/windows/love.exe')
+}
+windowsExe.dependsOn(love)
+
+task windows(type: Zip) {
+	dependsOn(windowsExe)
+
+	from 'dist/windows'
+	
+	baseName = 'MrRescue.windows'
+	destinationDir = file('zip')
+}
+
+task macDist(dependsOn: love) << {
+	copy {
+		from '../love2d-dist/love.app'
+		into 'dist/mac/MrRescue.app'
+	}
+	
+	copy{
+		from 'LICENSE'
+		into 'dist/mac'
+	}
+	
+	def config = new XMLPropertyListConfiguration()
+	config.load('dist/mac/MrRescue.app/Contents/Info.plist')
+	
+	config.setProperty("CFBundleIdentifier", "dk.tangramgames.MrRescue")
+	config.setProperty("CFBundleName", "Mr. Rescue")
+	
+	config.save('dist/mac/MrRescue.app/Contents/Info.plist')
+	
+	copy {
+		from 'build/build.love'
+		into 'dist/mac/MrRescue.app/Contents/Resources'
+	}
+}
+
+task mac(type: Zip) {
+	dependsOn(macDist)
+	
+	from 'dist/mac/'
+	
+	baseName = 'MrRescue.osx'
+	destinationDir = file('zip')
+}
